@@ -178,6 +178,19 @@ def main() -> int:
         except Exception as e:
             errors.append(f"{key}: {e}")
             print(f"[FAIL] {key}: {e}", file=sys.stderr)
+
+            # Instagram: try manual fallback before falling back to last known
+            # (useful when scraping is blocked from datacenter IPs)
+            if key == "instagram":
+                fallback = os.environ.get("INSTAGRAM_FALLBACK")
+                if fallback:
+                    try:
+                        stats[key] = int(fallback)
+                        print(f"       using INSTAGRAM_FALLBACK={stats[key]}", file=sys.stderr)
+                        continue
+                    except ValueError:
+                        pass
+
             # Keep last known good value if available
             if key in existing:
                 stats[key] = existing[key]
