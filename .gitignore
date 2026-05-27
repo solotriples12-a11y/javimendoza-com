@@ -18,6 +18,10 @@ dist/
 stats.json
 ig_debug.html
 
+# Tracker SQLite (persistente en volumen, nunca en repo)
+tracker.db
+data/
+
 # IDE / OS
 .vscode/
 .idea/
