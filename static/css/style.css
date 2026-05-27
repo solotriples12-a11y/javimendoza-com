@@ -152,8 +152,11 @@ footer {
         gap: 1.5rem;
     }
     /* Mismo ancho para todos los links → al centrarlos en columna,
-       los iconos caen en la misma columna vertical en todas las filas. */
+       los iconos caen en la misma columna vertical en todas las filas.
+       padding-left interno separa el icono del borde izquierdo del bloque,
+       que si no queda demasiado pegado al inicio del bloque centrado. */
     .link {
         min-width: 14rem;
+        padding-left: 1.5rem;
     }
 }
