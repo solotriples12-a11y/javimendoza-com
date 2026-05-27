@@ -151,4 +151,9 @@ footer {
         align-items: center;
         gap: 1.5rem;
     }
+    /* Mismo ancho para todos los links → al centrarlos en columna,
+       los iconos caen en la misma columna vertical en todas las filas. */
+    .link {
+        min-width: 14rem;
+    }
 }
