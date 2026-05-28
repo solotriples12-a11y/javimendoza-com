@@ -16,7 +16,11 @@
         .stats-table th { text-align: left; font-weight: 500; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
         .stats-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
         .stats-table .site { font-weight: 400; }
+        .stats-table td.ua { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; color: var(--text-muted); word-break: break-all; }
         .empty { color: var(--text-muted); font-style: italic; padding: 1rem 0; }
+        .toolbar { display: flex; gap: 1rem; margin-top: 3rem; font-size: 0.85rem; }
+        .toolbar a, .toolbar button { color: var(--text-muted); background: none; border: 1px solid #333; padding: 0.4rem 0.8rem; border-radius: 4px; text-decoration: none; cursor: pointer; font: inherit; }
+        .toolbar a:hover, .toolbar button:hover { color: var(--accent); border-color: var(--accent); }
     </style>
 </head>
 <body>
@@ -75,6 +79,41 @@
         {% else %}
         <p class="empty">Sin clicks registrados todavía.</p>
         {% endif %}
+
+        {% if user_agents is not none %}
+        <h2>User Agents (últimos 7d)</h2>
+        {% if user_agents %}
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>User Agent</th>
+                    <th class="num">Visitas</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in user_agents %}
+                <tr>
+                    <td class="ua">{{ row.ua }}</td>
+                    <td class="num">{{ row.n }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty">Sin datos.</p>
+        {% endif %}
+        {% endif %}
+
+        <div class="toolbar">
+            {% if user_agents is none %}
+            <a href="/stats?debug=1">Ver user agents</a>
+            {% else %}
+            <a href="/stats">Ocultar user agents</a>
+            {% endif %}
+            <form method="post" action="/stats/reset" style="display:inline" onsubmit="return confirm('¿Borrar TODAS las visitas y clicks?')">
+                <button type="submit">Resetear stats</button>
+            </form>
+        </div>
     </div>
 </body>
 </html>

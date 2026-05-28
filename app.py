@@ -23,25 +23,39 @@ PIXEL = (
     b"\x00\x00\x02\x02D\x01\x00;"
 )
 
+# Substrings that, if present in the user agent, identify a non-human visitor.
+# Match is case-insensitive. Kept aggressive on purpose — false positives on
+# real users are unlikely with these strings, false negatives inflate stats.
+BOT_UA_PATTERNS = (
+    "bot", "crawler", "spider", "scrape", "preview", "fetch",
+    "facebookexternalhit", "whatsapp", "telegram", "discord",
+    "slack", "twitter", "linkedin", "pinterest", "embedly", "outbrain",
+    "chatgpt", "gptbot", "claudebot", "anthropic", "perplexity",
+    "bingpreview", "yahoo!", "yandex", "duckduck", "applebot",
+    "ahrefs", "semrush", "moz.com", "majestic", "petalbot",
+    "headlesschrome", "phantomjs", "puppeteer", "playwright", "selenium",
+    "curl/", "wget/", "python-requests", "python-urllib", "go-http-client",
+    "okhttp", "axios", "node-fetch", "java/", "ruby",
+    "uptimerobot", "pingdom", "newrelic", "datadog", "statuscake", "monitor",
+    "feedfetcher", "feedly", "rss",
+)
+
 
 def _is_bot():
     ua = (request.user_agent.string or "").lower()
-    return any(b in ua for b in ("bot", "crawler", "spider", "preview", "fetch"))
+    if not ua:
+        return True
+    return any(p in ua for p in BOT_UA_PATTERNS)
 
 
-@app.before_request
-def track_own_visits():
-    if request.method != "GET":
-        return
-    if request.path.startswith(("/api/", "/r/", "/static/", "/stats")) or request.path == "/favicon.ico":
-        return
-    if _is_bot():
-        return
-    tracker.log_visit("javimendoza.com", request.path)
+def _ua():
+    return request.user_agent.string or ""
 
 
 @app.route("/")
 def index():
+    if not _is_bot():
+        tracker.log_visit("javimendoza.com", "/", _ua())
     return render_template(
         "index.html",
         youtube=stats.get_youtube_stats(),
@@ -56,6 +70,7 @@ def api_track():
         tracker.log_visit(
             request.args.get("site", ""),
             request.args.get("path", "/"),
+            _ua(),
         )
     response = Response(PIXEL, mimetype="image/gif")
     response.headers["Cache-Control"] = "no-store, must-revalidate"
@@ -69,20 +84,37 @@ def redirect_slug(slug):
     if not target:
         abort(404)
     if not _is_bot():
-        tracker.log_click(slug)
+        tracker.log_click(slug, _ua())
     return redirect(target, code=302)
+
+
+def _auth_ok():
+    expected = os.environ.get("STATS_PASSWORD", "")
+    auth = request.authorization
+    return expected and auth and auth.password == expected
 
 
 @app.route("/stats")
 def stats_dashboard():
-    expected = os.environ.get("STATS_PASSWORD", "")
-    auth = request.authorization
-    if not expected or not auth or auth.password != expected:
+    if not _auth_ok():
         return Response(
             "Auth required", 401,
             {"WWW-Authenticate": 'Basic realm="Stats"'},
         )
-    return render_template("stats.html", data=tracker.get_stats(), now=datetime.now())
+    return render_template(
+        "stats.html",
+        data=tracker.get_stats(),
+        user_agents=tracker.get_user_agents() if request.args.get("debug") else None,
+        now=datetime.now(),
+    )
+
+
+@app.route("/stats/reset", methods=["POST"])
+def stats_reset():
+    if not _auth_ok():
+        abort(401)
+    tracker.reset_all()
+    return redirect("/stats", code=302)
 
 
 if __name__ == "__main__":

@@ -33,6 +33,12 @@ def _conn():
         con.close()
 
 
+def _add_column_if_missing(con, table, column, ddl):
+    cols = {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
+    if column not in cols:
+        con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
 def init_db():
     with _conn() as con:
         con.executescript("""
@@ -51,23 +57,25 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_clicks_slug_ts ON clicks(slug, ts);
         """)
+        _add_column_if_missing(con, "visits", "user_agent", "TEXT")
+        _add_column_if_missing(con, "clicks", "user_agent", "TEXT")
 
 
-def log_visit(site: str, path: str):
+def log_visit(site: str, path: str, user_agent: str = ""):
     if site not in ALLOWED_SITES:
         return
     with _conn() as con:
         con.execute(
-            "INSERT INTO visits (site, path, ts) VALUES (?, ?, ?)",
-            (site, path[:200], int(time.time())),
+            "INSERT INTO visits (site, path, ts, user_agent) VALUES (?, ?, ?, ?)",
+            (site, path[:200], int(time.time()), user_agent[:300]),
         )
 
 
-def log_click(slug: str):
+def log_click(slug: str, user_agent: str = ""):
     with _conn() as con:
         con.execute(
-            "INSERT INTO clicks (slug, ts) VALUES (?, ?)",
-            (slug, int(time.time())),
+            "INSERT INTO clicks (slug, ts, user_agent) VALUES (?, ?, ?)",
+            (slug, int(time.time()), user_agent[:300]),
         )
 
 
@@ -112,3 +120,28 @@ def get_stats():
             })
 
     return {"visits": visits_by_site, "clicks": clicks_by_slug}
+
+
+def get_user_agents(limit: int = 30):
+    """Top user agents from visits in the last 7 days. For debugging bot traffic."""
+    since = int(time.time()) - 7 * 86400
+    with _conn() as con:
+        rows = con.execute(
+            """
+            SELECT COALESCE(user_agent, '(legacy/unknown)') AS ua, COUNT(*) AS n
+            FROM visits
+            WHERE ts >= ?
+            GROUP BY user_agent
+            ORDER BY n DESC
+            LIMIT ?
+            """,
+            (since, limit),
+        ).fetchall()
+    return [{"ua": r["ua"], "n": r["n"]} for r in rows]
+
+
+def reset_all():
+    """Wipe all visit/click data. Use to start fresh after legitimate traffic begins."""
+    with _conn() as con:
+        con.execute("DELETE FROM visits")
+        con.execute("DELETE FROM clicks")
