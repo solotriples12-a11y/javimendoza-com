@@ -38,12 +38,20 @@ BOT_UA_PATTERNS = (
     "okhttp", "axios", "node-fetch", "java/", "ruby",
     "uptimerobot", "pingdom", "newrelic", "datadog", "statuscake", "monitor",
     "feedfetcher", "feedly", "rss",
+    "playstore", "censys", "productfinder", "shodan", "expanse",
+    "masscan", "nmap", "zgrab",
 )
 
 
 def _is_bot():
     ua = (request.user_agent.string or "").lower()
-    if not ua:
+    # Empty UA or absurdly short (e.g. literal "Google", "Java") → bot.
+    if len(ua) < 20:
+        return True
+    # WebKit-based browsers ALWAYS finish the UA with "Safari/..." (and usually
+    # "Chrome/..." or "Version/..." before it). A bare "AppleWebKit/..." with no
+    # Safari token is a truncated/spoofed UA used by scrapers.
+    if "applewebkit/" in ua and "safari/" not in ua:
         return True
     return any(p in ua for p in BOT_UA_PATTERNS)
 
