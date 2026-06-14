@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-from flask import Flask, Response, abort, redirect, render_template, request
+from flask import Flask, Response, abort, make_response, redirect, render_template, request
 
 import stats
 import tracker
@@ -64,12 +64,19 @@ def _ua():
 def index():
     if not _is_bot():
         tracker.log_visit("javimendoza.com", "/", _ua())
-    return render_template(
-        "index.html",
-        youtube=stats.get_youtube_stats(),
-        instagram=stats.get_instagram_stats(),
-        current_year=datetime.now().year,
+    resp = make_response(
+        render_template(
+            "index.html",
+            youtube=stats.get_youtube_stats(),
+            instagram=stats.get_instagram_stats(),
+            current_year=datetime.now().year,
+        )
     )
+    # Igual que las subwebs nginx: revalidar el HTML para que los cambios se
+    # vean sin que el navegador sirva una copia cacheada (p. ej. una versión
+    # antigua con target="_blank" en los enlaces internos).
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 @app.route("/api/track")
